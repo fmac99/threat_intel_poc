@@ -6,8 +6,8 @@ import pandas as pd
 
 
 def create_asset_graph():
-    # Create graph object
-    G = nx.Graph()
+    # Change to DiGraph for directed edges
+    G = nx.DiGraph()
     
     # Define assets
     servers = [f"Server{i}" for i in range(1, 7)]  # 6 servers
@@ -28,13 +28,14 @@ def create_asset_graph():
         G.add_node(t, asset_type="threat")
     
     # Randomly connect each device to some servers
+    # Using device -> server for demonstration
     for d in devices:
         connect_count = random.randint(1, len(servers))
         connected_servers = random.sample(servers, k=connect_count)
         for s in connected_servers:
             G.add_edge(d, s, name="connects")
     
-    # Randomly connect threats to assets
+    # Randomly connect threats to assets as directed edges (threat -> asset)
     all_assets = servers + printer + devices
     for t in threats:
         threatened_assets_count = random.randint(1, len(all_assets))
@@ -53,23 +54,22 @@ def display_asset_graph(G):
     edge_x = []
     edge_y = []
     edge_text = []
-    for edge in G.edges(data=True):
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
+    for source, target, data in G.edges(data=True):
+        x0, y0 = pos[source]
+        x1, y1 = pos[target]
         edge_x.extend([x0, x1, None])
         edge_y.extend([y0, y1, None])
         
-        risk = edge[2].get("risk_score", "")
-        label = edge[2].get("name", "")
+        risk = data.get("risk_score", "")
+        label = data.get("name", "")
         if risk != "":
             edge_text.append(f"{label} | Risk: {risk}")
         else:
             edge_text.append(label)
-        edge_text.append("")
-        edge_text.append("")
+        edge_text.extend(["", ""])  # Align with None spacing
 
     edge_trace = go.Scatter(
-        x=edge_x,
+        x=edge_x, 
         y=edge_y,
         line=dict(width=1, color='gray'),
         hoverinfo='none',
@@ -81,24 +81,24 @@ def display_asset_graph(G):
     node_y = []
     node_text = []
     node_colors = []
-    for node, data in G.nodes(data=True):
+    for node, ndata in G.nodes(data=True):
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
-        
         node_text.append(str(node))
         
-        if data.get('asset_type') == "server":
+        # Color by asset type
+        if ndata.get('asset_type') == "server":
             node_colors.append("lightblue")
-        elif data.get('asset_type') == "printer":
+        elif ndata.get('asset_type') == "printer":
             node_colors.append("lightgreen")
-        elif data.get('asset_type') == "network_device":
+        elif ndata.get('asset_type') == "network_device":
             node_colors.append("orange")
         else:  # threat
             node_colors.append("red")
 
     node_trace = go.Scatter(
-        x=node_x,
+        x=node_x, 
         y=node_y,
         mode='markers+text',
         text=node_text,
@@ -111,15 +111,16 @@ def display_asset_graph(G):
         hoverinfo='text'
     )
 
-    # Edge label trace
+    # Edge label placement (calculate midpoints)
     mid_x = []
     mid_y = []
     for i in range(0, len(edge_x), 3):
         if i + 1 < len(edge_x):
-            mid_x.append((edge_x[i] + edge_x[i+1]) / 2 if edge_x[i+1] is not None else edge_x[i])
-            mid_y.append((edge_y[i] + edge_y[i+1]) / 2 if edge_y[i+1] is not None else edge_y[i])
+            x_mid = (edge_x[i] + edge_x[i+1]) / 2 if edge_x[i+1] is not None else edge_x[i]
+            y_mid = (edge_y[i] + edge_y[i+1]) / 2 if edge_y[i+1] is not None else edge_y[i]
+            mid_x.append(x_mid)
+            mid_y.append(y_mid)
 
-    # Attach edge text to midpoints
     edge_label_trace = go.Scatter(
         x=mid_x,
         y=mid_y,
@@ -131,7 +132,7 @@ def display_asset_graph(G):
 
     fig = go.Figure(data=[edge_trace, node_trace, edge_label_trace],
                     layout=go.Layout(
-                        title='Network Asset & Threat Graph',
+                        title='Directed Threat & Asset Graph',
                         showlegend=False,
                         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -174,15 +175,15 @@ def display_graph_tables(G):
     
     # Display
     st.subheader("Nodes Table")
-    st.dataframe(node_df, use_container_width=True)
+    st.data_editor(node_df, use_container_width=True, hide_index=True)
     
     st.subheader("Edges Table")
-    st.dataframe(edge_df, use_container_width=True)
+    st.data_editor(edge_df, use_container_width=True, hide_index=True)
 
 
 def main():
-    st.title("Network Asset & Threat Graph (Plotly)")
-    if st.button("Generate Asset & Threat Graph"):
+    st.title("Directed Threat & Asset Graph")
+    if st.button("Create & Display Graph"):
         graph = create_asset_graph()
         display_asset_graph(graph)
         display_graph_tables(graph)
