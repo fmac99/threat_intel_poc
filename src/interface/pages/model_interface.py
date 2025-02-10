@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import sqlalchemy
+import time
 
 def get_engine(db_user, db_pass, db_host, db_name):
     """Create a SQLAlchemy engine for the specified database."""
@@ -73,6 +74,31 @@ def model_interface():
     if st.button("Load Model"):
         st.success(f"{chosen_model} model selected!")
         st.session_state["model_name"] = chosen_model
+
+    # Run Model
+    if st.button("Run Model"):
+        st.subheader("Model Output")
+        running = True
+        i = 0
+        text_area = st.empty()
+        while running:
+            if i%3 == 0:
+                text_area.write("Running model.")
+                time.sleep(2)
+
+            elif i%3 == 1:
+                text_area.write("Running model..")
+                time.sleep(2)
+            elif i%3 == 2:
+                text_area.write("Running model...")
+                time.sleep(2)
+            
+            i += 1
+            if i == 5:
+                running = False
+                break
+
+        st.write("Model run complete!")
 
 if __name__ == "__main__":
     model_interface()
