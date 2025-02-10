@@ -50,7 +50,16 @@ def groq_chat():
 
 def threat_dashboard():
     st.title("Threat Intelligence Dashboard")
-
+    # High-level stat cards
+    colA, colB, colC, colD = st.columns(4)
+    with colA:
+        st.metric("Active Incidents", "23", "+5")
+    with colB:
+        st.metric("Critical Threats", "12", "+2")
+    with colC:
+        st.metric("Avg Severity Score", "7.5", "+0.3")
+    with colD:
+        st.metric("High Risk Assets", "15")
     # Toggle Chat
     if 'show_chat_interface' not in st.session_state:
         st.session_state.show_chat_interface = False
@@ -75,7 +84,21 @@ def threat_dashboard():
         st.subheader("Threat Timeline")
         dates = pd.date_range(start='2024-01-01', periods=10, freq='D')
         df_timeline = pd.DataFrame({'Date': dates, 'Threats': st.session_state["threat_data"]["timeline"]})
-        fig_timeline = px.line(df_timeline, x='Date', y='Threats', title='Daily Threat Activity')
+        
+        # Slicers to control time series
+        min_date = df_timeline["Date"].min()
+        max_date = df_timeline["Date"].max()
+        date_range = st.date_input("Select Date Range", [min_date, max_date])
+
+        if len(date_range) == 2:
+            start_date, end_date = date_range
+            # Filter data according to selected dates
+            df_filtered = df_timeline[(df_timeline["Date"] >= pd.to_datetime(start_date)) &
+                                      (df_timeline["Date"] <= pd.to_datetime(end_date))]
+        else:
+            df_filtered = df_timeline
+
+        fig_timeline = px.line(df_filtered, x='Date', y='Threats', title='Daily Threat Activity')
         st.plotly_chart(fig_timeline, use_container_width=True)
 
         st.subheader("Geographic Distribution")
@@ -86,11 +109,63 @@ def threat_dashboard():
                                 color='threats',
                                 title='Threat Origin Distribution')
         st.plotly_chart(fig_geo, use_container_width=True)
-        column1, column2 = st.columns(2)
-        with column1:
-            st.data_editor(df_geo)
-        with column2:
-            st.data_editor(df_timeline)
+        st.subheader("Threat Distribution (Pie)")
+        df_distribution = pd.DataFrame({
+            "Type": ["Ransomware", "Malware", "Phishing", "Others"], 
+            "Count": [12, 18, 7, 5]
+        })
+        fig_dist = px.pie(df_distribution, values='Count', names='Type', title='Threat Distribution')
+        st.plotly_chart(fig_dist, use_container_width=True)
+        st.subheader("Geo Data & Timeline Data Editors")
+
+        # Filtering and sorting controls for df_geo
+        st.markdown("#### Filter & Sort Geo Data")
+        geo_filter_col = st.selectbox("Filter column (Geo)", df_geo.columns, key="geo_filter_col")
+        geo_filter_val = st.text_input("Filter value (Geo)", key="geo_filter_val")
+        geo_sort_col = st.selectbox("Sort by column (Geo)", df_geo.columns, key="geo_sort_col")
+        geo_desc = st.checkbox("Sort descending (Geo)", key="geo_desc")
+
+        df_geo_filtered = df_geo.copy()
+
+        # Apply filter (simple equality check)
+        if geo_filter_val:
+            df_geo_filtered = df_geo_filtered[df_geo_filtered[geo_filter_col].astype(str) == geo_filter_val]
+
+        # Apply sorting
+        df_geo_filtered = df_geo_filtered.sort_values(by=geo_sort_col, ascending=not geo_desc)
+
+        # Data editor for df_geo
+        st.data_editor(
+            df_geo_filtered, 
+            hide_index=True, 
+            num_rows="dynamic"
+        )
+
+        # Filtering and sorting controls for df_timeline
+        st.markdown("#### Filter & Sort Timeline Data")
+        time_filter_col = st.selectbox("Filter column (Timeline)", df_timeline.columns, key="time_filter_col")
+        time_filter_val = st.text_input("Filter value (Timeline)", key="time_filter_val")
+        time_sort_col = st.selectbox("Sort by column (Timeline)", df_timeline.columns, key="time_sort_col")
+        time_desc = st.checkbox("Sort descending (Timeline)", key="time_desc")
+
+        df_timeline_filtered = df_timeline.copy()
+
+        # Apply filter (simple equality check)
+        if time_filter_val:
+            df_timeline_filtered = df_timeline_filtered[
+                df_timeline_filtered[time_filter_col].astype(str) == time_filter_val
+            ]
+
+        # Apply sorting
+        df_timeline_filtered = df_timeline_filtered.sort_values(by=time_sort_col, ascending=not time_desc)
+
+        # Data editor for df_timeline
+        st.data_editor(
+            df_timeline_filtered, 
+            hide_index=True, 
+            num_rows="dynamic"
+        )
+
     if st.session_state.show_chat_interface:
         with col2:
             st.subheader("Threat Intelligence Chat Assistant")
